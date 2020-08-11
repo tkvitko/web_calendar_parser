@@ -1,16 +1,9 @@
-import time
-import wget
-import os
-import re
 import logging
 
 from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.chrome.options import Options
 from sys import argv
+from time import sleep
 import configparser
 
 header = {
@@ -24,19 +17,9 @@ chrome_options.add_argument('enable-features=NetworkServiceInProcess')
 chrome_options.add_argument('--no-sandbox')
 driver = webdriver.Chrome('./chromedriver', options=chrome_options)
 
-# Чтение конфига
-config = configparser.ConfigParser()  # создаём объекта парсера
-config.read("config.ini")  # читаем конфиг
-time_wanted = (config["keys"]["time_wanted"])
-name = (config["keys"]["name"])
-organization = (config["keys"]["organization"])
-phone = (config["keys"]["phone"])
-addr = (config["keys"]["addr"])
-email = (config["keys"]["email"])
-room = (config["keys"]["room"])
-reverse_day_order = (config["keys"]["reverse_day_order"])
 
-url = f'https://www.kurgan-city.ru/gosserv/prerecord/?ROOM_ID={room}'
+
+
 
 times_list = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00',
               '14:30', '15:00', '15:30']
@@ -92,52 +75,79 @@ def parse_record(record_url, submission):
 
 if __name__ == "__main__":
 
-    script, if_submit = argv
-    submission = False
-    if if_submit == 'submit':
-        submission = True
+    done = False
+    while done is not True:
 
-    # вынимаем URl доступных дней из комнаты
-    day_urls = parse_room(url)
+        script, if_submit, configname = argv
 
-    # Если в конфиге revers day order, меняем порядок дней, чтобы начать перебор с последнего
-    if reverse_day_order == True:
-        day_urls.reverse()
+        # Чтение конфига
+        config = configparser.ConfigParser()  # создаём объекта парсера
+        config.read(configname, encoding='utf-8')  # читаем конфиг
+        time_wanted = (config["keys"]["time_wanted"])
+        name = (config["keys"]["name"])
+        organization = (config["keys"]["organization"])
+        phone = (config["keys"]["phone"])
+        addr = (config["keys"]["addr"])
+        email = (config["keys"]["email"])
+        room = (config["keys"]["room"])
+        reverse_day_order = (config["keys"]["reverse_day_order"])
+        timeout = int((config["keys"]["timeout"]))
 
-    # TBD алгоритм неидеален, стоит переработать, если будет время
-    # для кадого доступного дня перебираем его талоны:
-    for day_url in day_urls:
-        # маркер того, что еще не записались:
-        done = False
-        # список доступных записей дня:
-        records = parse_day(day_url)
+        url = f'https://www.kurgan-city.ru/gosserv/prerecord/?ROOM_ID={room}'
 
-        # ищем желаемое время среди списка талонов:
-        while time_wanted not in records:
-            # узнаем индекс времени из списка времен:
-            pos_in_list = times_list.index(time_wanted)
-            # пробуем взять следующее время из списка времен?
-            try:
-                next_pos = pos_in_list + 1
-                time_wanted = times_list[next_pos]
-            #если не получилось, значит, прошли весь день и не нашли ни одного талона:
-            except IndexError:
-                # сбрасываем значение времени на желаемое:
-                time_wanted = (config["keys"]["time_wanted"])
+        submission = False
+        if if_submit == 'submit':
+            submission = True
+
+
+
+        # вынимаем URl доступных дней из комнаты
+        day_urls = parse_room(url)
+
+        if len(day_urls) == 0:
+            sleep(timeout)
+
+        # Если в конфиге revers day order, меняем порядок дней, чтобы начать перебор с последнего
+        if reverse_day_order == True:
+            day_urls.reverse()
+
+        # TBD алгоритм неидеален, стоит переработать, если будет время
+        # для кадого доступного дня перебираем его талоны:
+        for day_url in day_urls:
+            # маркер того, что еще не записались:
+            #done = False
+            # список доступных записей дня:
+            records = parse_day(day_url)
+
+            # if len(records) == 0:
+            #     sleep(timeout)
+
+            # ищем желаемое время среди списка талонов:
+            while time_wanted not in records:
+                # узнаем индекс времени из списка времен:
+                pos_in_list = times_list.index(time_wanted)
+                # пробуем взять следующее время из списка времен?
+                try:
+                    next_pos = pos_in_list + 1
+                    time_wanted = times_list[next_pos]
+                #если не получилось, значит, прошли весь день и не нашли ни одного талона:
+                except IndexError:
+                    # сбрасываем значение времени на желаемое:
+                    time_wanted = (config["keys"]["time_wanted"])
+                    break
+                except KeyError:
+                    time_wanted = (config["keys"]["time_wanted"])
+                    break
+            # если желаемое (или большее время) нашлось:
+            if time_wanted in records:
+                # заполняем форму
+                record_url = records[time_wanted]
+                parse_record(record_url, submission)
+                done = True
+            # если не нашлось, идем в следующий день
+            else:
+                pass
+
+            # если запись удалась, не идем в следующий день, работа окончена:
+            if done:
                 break
-            except KeyError:
-                time_wanted = (config["keys"]["time_wanted"])
-                break
-        # если желаемое (или большее время) нашлось:
-        if time_wanted in records:
-            # заполняем форму
-            record_url = records[time_wanted]
-            parse_record(record_url, submission)
-            done = True
-        # если не нашлось, идем в следующий день
-        else:
-            pass
-
-        # если запись удалась, не идем в следующий день, работа окончена:
-        if done:
-            break
