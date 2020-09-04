@@ -17,10 +17,6 @@ chrome_options.add_argument('enable-features=NetworkServiceInProcess')
 chrome_options.add_argument('--no-sandbox')
 driver = webdriver.Chrome('./chromedriver', options=chrome_options)
 
-
-
-
-
 times_list = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00',
               '14:30', '15:00', '15:30']
 
@@ -99,8 +95,6 @@ if __name__ == "__main__":
         if if_submit == 'submit':
             submission = True
 
-
-
         # вынимаем URl доступных дней из комнаты
         day_urls = parse_room(url)
 
@@ -115,7 +109,7 @@ if __name__ == "__main__":
         # для кадого доступного дня перебираем его талоны:
         for day_url in day_urls:
             # маркер того, что еще не записались:
-            #done = False
+            # done = False
             # список доступных записей дня:
             records = parse_day(day_url)
 
@@ -130,7 +124,7 @@ if __name__ == "__main__":
                 try:
                     next_pos = pos_in_list + 1
                     time_wanted = times_list[next_pos]
-                #если не получилось, значит, прошли весь день и не нашли ни одного талона:
+                # если не получилось, значит, прошли весь день и не нашли ни одного талона:
                 except IndexError:
                     # сбрасываем значение времени на желаемое:
                     time_wanted = (config["keys"]["time_wanted"])
