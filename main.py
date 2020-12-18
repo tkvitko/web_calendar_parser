@@ -17,16 +17,21 @@ chrome_options.add_argument('enable-features=NetworkServiceInProcess')
 chrome_options.add_argument('--no-sandbox')
 driver = webdriver.Chrome('./chromedriver', options=chrome_options)
 
-times_list = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00',
+TIMES_LIST = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00',
               '14:30', '15:00', '15:30']
 
 
 def parse_room(room_url):
+    # Функция парсинга комнаты
+    # На входе: url комнаты
+    # на выходе: список urls дат
+
     driver.get(room_url)
 
-    # Сохраняем список URLs на марки:
+    # Сохраняем список URLs на дни:
     free_dates = driver.find_elements_by_class_name('view-month-calendar-day-have-free-slots')
-    logging.info(f'Marks count: {len(free_dates)}')
+    logging.info(f'Free dates count: {len(free_dates)}')
+
     day_urls = []  # каждый URL ведет на конкретную дату
     for i in range(len(free_dates)):
         # mark_name = marks_urls_blocks[i].text
@@ -38,12 +43,15 @@ def parse_room(room_url):
 
 
 def parse_day(day_url):
-    driver.get(day_url)
+    # Функция парсинга даты
+    # На входе: url даты
+    # на выходе: список urls записей
 
+    driver.get(day_url)
     times = driver.find_elements_by_class_name('day-hour')
+
     record_urls = {}
     for time in times:
-        record = {}
         time_clock = time.find_element_by_class_name('day-hour-time').text
         time_link = None
         try:
@@ -52,12 +60,14 @@ def parse_day(day_url):
             pass
         if time_link:
             record_urls[time_clock] = time_link.get_attribute('href')
-        # records.append(record)
 
     return record_urls
 
 
 def parse_record(record_url, submission):
+    # Функция парсинга записи
+    # На входе: url записи, режим работы (тестовый/боевой)
+
     driver.get(record_url)
 
     driver.find_element_by_id('record-name').send_keys(name)
@@ -65,6 +75,7 @@ def parse_record(record_url, submission):
     driver.find_element_by_id('record-phone').send_keys(phone)
     driver.find_element_by_id('record-addr').send_keys(addr)
     driver.find_element_by_id('record-email').send_keys(email)
+
     if submission:
         driver.find_element_by_id('record-email').submit()
 
@@ -102,7 +113,7 @@ if __name__ == "__main__":
             sleep(timeout)
 
         # Если в конфиге revers day order, меняем порядок дней, чтобы начать перебор с последнего
-        if reverse_day_order == True:
+        if reverse_day_order:
             day_urls.reverse()
 
         # TBD алгоритм неидеален, стоит переработать, если будет время
@@ -113,17 +124,14 @@ if __name__ == "__main__":
             # список доступных записей дня:
             records = parse_day(day_url)
 
-            # if len(records) == 0:
-            #     sleep(timeout)
-
             # ищем желаемое время среди списка талонов:
             while time_wanted not in records:
                 # узнаем индекс времени из списка времен:
-                pos_in_list = times_list.index(time_wanted)
+                pos_in_list = TIMES_LIST.index(time_wanted)
                 # пробуем взять следующее время из списка времен?
                 try:
                     next_pos = pos_in_list + 1
-                    time_wanted = times_list[next_pos]
+                    time_wanted = TIMES_LIST[next_pos]
                 # если не получилось, значит, прошли весь день и не нашли ни одного талона:
                 except IndexError:
                     # сбрасываем значение времени на желаемое:
