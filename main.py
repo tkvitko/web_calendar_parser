@@ -15,13 +15,13 @@ chrome_options.add_argument('start-maximized')
 # на всякий случай, без этого могло упасть по timeout:
 chrome_options.add_argument('enable-features=NetworkServiceInProcess')
 chrome_options.add_argument('--no-sandbox')
-driver = webdriver.Chrome('./chromedriver', options=chrome_options)
+driver = webdriver.Chrome('../chromedriver', options=chrome_options)
 
 TIMES_LIST = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00',
               '14:30', '15:00', '15:30']
 
 
-def parse_room(room_url):
+def parse_room(room_url, day_of_month):
     # Функция парсинга комнаты
     # На входе: url комнаты
     # на выходе: список urls дат
@@ -30,14 +30,27 @@ def parse_room(room_url):
 
     # Сохраняем список URLs на дни:
     free_dates = driver.find_elements_by_class_name('view-month-calendar-day-have-free-slots')
+
     logging.info(f'Free dates count: {len(free_dates)}')
 
     day_urls = []  # каждый URL ведет на конкретную дату
     for i in range(len(free_dates)):
         # mark_name = marks_urls_blocks[i].text
-        day_link = free_dates[i].find_element_by_class_name('view-month-calendar-day-link')
-        day_url = day_link.get_attribute('href')
-        day_urls.append(day_url)
+        if day_of_month:
+            day_number = free_dates[i].find_element_by_class_name('view-month-calendar-day-date')
+            day_number = int(day_number.text)
+            print(day_number)
+            if day_number == day_of_month:
+                take = True
+            else:
+                take = False
+        else:
+            take = True
+
+        if take:
+            day_link = free_dates[i].find_element_by_class_name('view-month-calendar-day-link')
+            day_url = day_link.get_attribute('href')
+            day_urls.append(day_url)
 
     return day_urls
 
@@ -86,11 +99,14 @@ if __name__ == "__main__":
     while done is not True:
 
         script, if_submit, configname = argv
+        # if_submit = False
+        # configname = 'config.ini'
 
         # Чтение конфига
         config = configparser.ConfigParser()  # создаём объекта парсера
         config.read(configname, encoding='utf-8')  # читаем конфиг
         time_wanted = (config["keys"]["time_wanted"])
+        day_of_month = (config["keys"]["data"])
         name = (config["keys"]["name"])
         organization = (config["keys"]["organization"])
         phone = (config["keys"]["phone"])
@@ -107,7 +123,7 @@ if __name__ == "__main__":
             submission = True
 
         # вынимаем URl доступных дней из комнаты
-        day_urls = parse_room(url)
+        day_urls = parse_room(url, day_of_month)
 
         if len(day_urls) == 0:
             sleep(timeout)
