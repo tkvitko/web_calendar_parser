@@ -39,7 +39,7 @@ def parse_room(room_url, day_of_month):
         if day_of_month:
             day_number = free_dates[i].find_element_by_class_name('view-month-calendar-day-date')
             day_number = int(day_number.text)
-            print(day_number)
+            #print(day_number)
             if day_number == day_of_month:
                 take = True
             else:
