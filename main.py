@@ -12,7 +12,6 @@ header = {
 
 chrome_options = Options()
 chrome_options.add_argument('start-maximized')
-# на всякий случай, без этого могло упасть по timeout:
 chrome_options.add_argument('enable-features=NetworkServiceInProcess')
 chrome_options.add_argument('--no-sandbox')
 driver = webdriver.Chrome('./chromedriver', options=chrome_options)
@@ -22,24 +21,26 @@ TIMES_LIST = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12
 
 
 def parse_room(room_url, day_of_month):
-    # Функция парсинга комнаты
-    # На входе: url комнаты
-    # на выходе: список urls дат
+    """
+    Room scrapping
+    :param room_url: url of the room
+    :param day_of_month: number of month's day
+    :return: list of urls of dates
+    """
 
     driver.get(room_url)
 
-    # Сохраняем список URLs на дни:
+    # getting the list of urls of dates
     free_dates = driver.find_elements_by_class_name('view-month-calendar-day-have-free-slots')
 
     logging.info(f'Free dates count: {len(free_dates)}')
 
-    day_urls = []  # каждый URL ведет на конкретную дату
+    day_urls = []  # every url is for specific date
     for i in range(len(free_dates)):
         # mark_name = marks_urls_blocks[i].text
         if day_of_month:
             day_number = free_dates[i].find_element_by_class_name('view-month-calendar-day-date')
             day_number = int(day_number.text)
-            #print(day_number)
             if day_number == day_of_month:
                 take = True
             else:
@@ -56,9 +57,11 @@ def parse_room(room_url, day_of_month):
 
 
 def parse_day(day_url):
-    # Функция парсинга даты
-    # На входе: url даты
-    # на выходе: список urls записей
+    """
+    Date scrapping
+    :param day_url: url of date
+    :return: list of bookings
+    """
 
     driver.get(day_url)
     times = driver.find_elements_by_class_name('day-hour')
@@ -78,8 +81,12 @@ def parse_day(day_url):
 
 
 def parse_record(record_url, submission):
-    # Функция парсинга записи
-    # На входе: url записи, режим работы (тестовый/боевой)
+    """
+    Scrapping og booking
+    :param record_url: url for booking
+    :param submission: mode
+    :return: None
+    """
 
     driver.get(record_url)
 
@@ -99,12 +106,14 @@ if __name__ == "__main__":
     while done is not True:
 
         script, if_submit, configname = argv
+
+        # For testing:
         # if_submit = False
         # configname = 'config.ini'
 
-        # Чтение конфига
-        config = configparser.ConfigParser()  # создаём объекта парсера
-        config.read(configname, encoding='utf-8')  # читаем конфиг
+        # getting values from config file
+        config = configparser.ConfigParser()
+        config.read(configname, encoding='utf-8')
         time_wanted = (config["keys"]["time_wanted"])
         day_of_month = (config["keys"]["data"])
         name = (config["keys"]["name"])
@@ -122,50 +131,47 @@ if __name__ == "__main__":
         if if_submit == 'submit':
             submission = True
 
-        # вынимаем URl доступных дней из комнаты
+        # getting date urls from room page
         day_urls = parse_room(url, day_of_month)
 
         if len(day_urls) == 0:
             sleep(timeout)
 
-        # Если в конфиге revers day order, меняем порядок дней, чтобы начать перебор с последнего
         if reverse_day_order:
             day_urls.reverse()
 
-        # TBD алгоритм неидеален, стоит переработать, если будет время
-        # для кадого доступного дня перебираем его талоны:
+        # TBD refactor this algorithm in the future (not ideal)
+        # going through booking for each available date
         for day_url in day_urls:
-            # маркер того, что еще не записались:
-            # done = False
-            # список доступных записей дня:
+            done = False
             records = parse_day(day_url)
 
-            # ищем желаемое время среди списка талонов:
+            # looking for desired time
             while time_wanted not in records:
-                # узнаем индекс времени из списка времен:
+                # getting the index of desired time
                 pos_in_list = TIMES_LIST.index(time_wanted)
-                # пробуем взять следующее время из списка времен?
+                # getting the next time from the list of times
                 try:
                     next_pos = pos_in_list + 1
                     time_wanted = TIMES_LIST[next_pos]
-                # если не получилось, значит, прошли весь день и не нашли ни одного талона:
                 except IndexError:
-                    # сбрасываем значение времени на желаемое:
+                    # no one booking has been find
+                    # setting the time value to the desired
                     time_wanted = (config["keys"]["time_wanted"])
                     break
                 except KeyError:
                     time_wanted = (config["keys"]["time_wanted"])
                     break
-            # если желаемое (или большее время) нашлось:
-            if time_wanted in records:
-                # заполняем форму
+
+            if time_wanted in records:  # if desired (or neighboring) time has been found
+                # filling the web form
                 record_url = records[time_wanted]
                 parse_record(record_url, submission)
                 done = True
-            # если не нашлось, идем в следующий день
             else:
+                # going to the next date
                 pass
 
-            # если запись удалась, не идем в следующий день, работа окончена:
+            # if booking has been done, finish
             if done:
                 break
